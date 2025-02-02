@@ -8,8 +8,7 @@ const taskSchema = new mongoose.Schema({
   description: String,
   status: {
     type: String,
-    enum: ['todo', 'inprogress', 'done'],
-    default: 'todo'
+    required: true
   },
   order: {
     type: Number,
@@ -30,7 +29,23 @@ const taskSchema = new mongoose.Schema({
   }
 });
 
+const sectionSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  order: {
+    type: Number,
+    default: 0
+  }
+});
+
 const boardSchema = new mongoose.Schema({
+  sections: [sectionSchema],
   tasks: [taskSchema]
 });
 
