@@ -6,23 +6,19 @@ const Board = require('./models/Board');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connection
 mongoose.connect('mongodb+srv://nikhilsaha:KanbanBoard@cluster0.7dpfl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Initialize default sections if board doesn't exist
 const defaultSections = [
   { id: '1', title: 'Todo', order: 0 },
   { id: '2', title: 'In Progress', order: 1 },
   { id: '3', title: 'Done', order: 2 }
 ];
 
-// Routes
 app.get('/api/board', async (req, res) => {
   try {
     let board = await Board.findOne();
@@ -87,10 +83,9 @@ app.delete('/api/sections/:sectionId', async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    // Remove the section
+  
     board.sections = board.sections.filter(s => s.id !== req.params.sectionId);
     
-    // Remove all tasks in this section
     const sectionTitle = board.sections.find(s => s.id === req.params.sectionId)?.title;
     if (sectionTitle) {
       board.tasks = board.tasks.filter(task => 
