@@ -20,6 +20,16 @@ const defaultSections = [
   { id: '3', title: 'Done', order: 2 }
 ];
 
+app.get("/api/health", (req, res)=>{
+  try{
+    return res.json({ status:"OK" });
+  }
+ catch(err){
+   console.error("Error:",err);
+   res.status(500).json({ message: "Server Error" });
+ 
+ }
+})
 app.get('/api/board', async (req, res) => {
   try {
     let board = await Board.findOne();
