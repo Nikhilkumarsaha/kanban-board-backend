@@ -45,6 +45,11 @@ const sectionSchema = new mongoose.Schema({
 });
 
 const boardSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   sections: [sectionSchema],
   tasks: [taskSchema]
 });

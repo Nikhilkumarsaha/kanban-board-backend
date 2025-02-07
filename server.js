@@ -1,8 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const Board = require('./models/Board');
-require('dotenv').config()
+const User = require('./models/User');
+const auth = require('./middleware/auth');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -20,21 +24,90 @@ const defaultSections = [
   { id: '3', title: 'Done', order: 2 }
 ];
 
-app.get("/api/health", (req, res)=>{
-  try{
-    return res.json({ status:"OK" });
-  }
- catch(err){
-   console.error("Error:",err);
-   res.status(500).json({ message: "Server Error" });
- 
- }
-})
-app.get('/api/board', async (req, res) => {
+// Auth routes
+app.post('/api/auth/signup', async (req, res) => {
   try {
-    let board = await Board.findOne();
+    const { email, password, name } = req.body;
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    const user = new User({ email, password, name });
+    await user.save();
+
+    // Create default board for new user
+    await Board.create({
+      userId: user._id,
+      sections: defaultSections,
+      tasks: []
+    });
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '7d'
+    });
+
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name
+      }
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '7d'
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name
+      }
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Protected routes
+app.get("/api/health", (req, res) => {
+  try {
+    return res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+app.get('/api/board', auth, async (req, res) => {
+  try {
+    let board = await Board.findOne({ userId: req.user._id });
     if (!board) {
-      board = await Board.create({ 
+      board = await Board.create({
+        userId: req.user._id,
         sections: defaultSections,
         tasks: []
       });
@@ -45,9 +118,9 @@ app.get('/api/board', async (req, res) => {
   }
 });
 
-app.post('/api/sections', async (req, res) => {
+app.post('/api/sections', auth, async (req, res) => {
   try {
-    const board = await Board.findOne();
+    const board = await Board.findOne({ userId: req.user._id });
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
@@ -67,9 +140,9 @@ app.post('/api/sections', async (req, res) => {
   }
 });
 
-app.patch('/api/sections/:sectionId', async (req, res) => {
+app.patch('/api/sections/:sectionId', auth, async (req, res) => {
   try {
-    const board = await Board.findOne();
+    const board = await Board.findOne({ userId: req.user._id });
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
@@ -87,14 +160,13 @@ app.patch('/api/sections/:sectionId', async (req, res) => {
   }
 });
 
-app.delete('/api/sections/:sectionId', async (req, res) => {
+app.delete('/api/sections/:sectionId', auth, async (req, res) => {
   try {
-    const board = await Board.findOne();
+    const board = await Board.findOne({ userId: req.user._id });
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-  
     board.sections = board.sections.filter(s => s.id !== req.params.sectionId);
     
     const sectionTitle = board.sections.find(s => s.id === req.params.sectionId)?.title;
@@ -111,9 +183,9 @@ app.delete('/api/sections/:sectionId', async (req, res) => {
   }
 });
 
-app.post('/api/tasks', async (req, res) => {
+app.post('/api/tasks', auth, async (req, res) => {
   try {
-    const board = await Board.findOne();
+    const board = await Board.findOne({ userId: req.user._id });
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
@@ -135,9 +207,9 @@ app.post('/api/tasks', async (req, res) => {
   }
 });
 
-app.patch('/api/tasks/:taskId', async (req, res) => {
+app.patch('/api/tasks/:taskId', auth, async (req, res) => {
   try {
-    const board = await Board.findOne();
+    const board = await Board.findOne({ userId: req.user._id });
     const task = board.tasks.id(req.params.taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -158,9 +230,9 @@ app.patch('/api/tasks/:taskId', async (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:taskId', async (req, res) => {
+app.delete('/api/tasks/:taskId', auth, async (req, res) => {
   try {
-    const board = await Board.findOne();
+    const board = await Board.findOne({ userId: req.user._id });
     const taskToDelete = board.tasks.id(req.params.taskId);
     if (!taskToDelete) {
       return res.status(404).json({ message: 'Task not found' });
