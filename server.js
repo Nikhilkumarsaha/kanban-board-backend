@@ -24,7 +24,6 @@ const defaultSections = [
   { id: '3', title: 'Done', order: 2 }
 ];
 
-// Auth routes
 app.post('/api/auth/signup', async (req, res) => {
   try {
     const { email, password, name } = req.body;
@@ -37,7 +36,6 @@ app.post('/api/auth/signup', async (req, res) => {
     const user = new User({ email, password, name });
     await user.save();
 
-    // Create default board for new user
     await Board.create({
       userId: user._id,
       sections: defaultSections,
@@ -92,7 +90,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Protected routes
 app.get("/api/health", (req, res) => {
   try {
     return res.json({ status: "OK" });
